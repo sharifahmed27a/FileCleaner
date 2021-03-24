@@ -1,0 +1,165 @@
+$global:browsepath = "D:\source\repos\"
+$global:cleaned=$false
+
+function Remove-File()
+{
+    param($file)
+
+    if (Test-Path $file) 
+    {
+        Remove-Item -Recurse -Force $file 
+        Set-Variable -Name "cleaned" -Value $true -Scope global
+    }
+}
+
+function Cleanup-Script()
+{
+
+    param($scriptdir)
+
+    Remove-File "$scriptdir\logfile.log"
+    Remove-File "$scriptdir\mdrv*.log"
+    Remove-File "$scriptdir\mdrv_cmd.txt"    
+    Remove-File "$scriptdir\options.txt"
+    Remove-File "$scriptdir\output.txt"
+    Remove-File "$scriptdir\pre_cci.c"
+    Remove-File "$scriptdir\combined_*.c"
+    Remove-File "$scriptdir\debug.inf"
+    Remove-File "$scriptdir\replay.har"
+    Remove-File "$scriptdir\shunra.shunra"
+    Remove-File "$scriptdir\*.ci"
+    Remove-File "$scriptdir\*.idx"
+    Remove-File "$scriptdir\*.bak"
+    Remove-File "$scriptdir\*.pickle"
+    Remove-File "$scriptdir\OutputColoringDatabase.json"
+    Remove-File "$scriptdir\ThumbnailsCache.tmp"
+    
+    Remove-File "$scriptdir\result1"
+    
+    if($radiobutton1.Checked)
+    {
+        $dataitems=Get-ChildItem -Path "$scriptdir\data\" -Recurse -Exclude *.c, *.h , *.dat, *.ini, CodeGenerationLog.txt 
+    }
+    else
+    {
+       $dataitems=Get-ChildItem -Path "$scriptdir\data\" -Recurse -Exclude *.c, *.h , *.dat, *.ini              
+    }
+    if($dataitems.length -gt 0)
+    {
+        Remove-File $dataitems
+    }
+    
+
+    Write-Host($radiobutton1.Checked)
+
+    
+}
+
+Function Get-Folder()
+{
+    [System.Reflection.Assembly]::LoadWithPartialName("System.windows.forms")|Out-Null
+
+    $foldername = New-Object System.Windows.Forms.FolderBrowserDialog
+    $foldername.Description = "Select one or more script folders (iteratively)"
+    #$foldername.rootfolder = Environment.SpecialFolder.MyDocuments
+    $foldername.SelectedPath = $browsepath
+   
+
+    Set-Variable -Name "cleaned" -Value $false -Scope global
+    $scriptdirs = @()
+
+    while($foldername.ShowDialog() -ne "Cancel")
+    {        
+        if(!(Get-ChildItem -Path $foldername.SelectedPath -Filter *.usr))
+        {
+            $status_label.Text = "Status: Select a valid script folder"
+            return
+        }        
+        $scriptdirs+= $foldername.SelectedPath
+    }
+   
+    if(($scriptdirs.length -gt 0))
+    {        
+        $status_label.Text = "Status: In progress"
+        Sleep -Seconds 1
+        foreach ($scriptdir in $scriptdirs)         
+        {
+            Cleanup-Script($scriptdir)
+            if($cleaned -eq $true)
+            {
+                $status_label.Text = "Status: Completed"
+            }
+            else
+            {
+                $status_label.Text = "Status: Nothing to clean"
+            }
+        }
+     }
+}
+
+
+
+
+Add-Type -assembly System.Windows.Forms
+
+
+$main_form = New-Object System.Windows.Forms.Form
+$main_form.Text ='LR Script Cleaner'
+$main_form.Width = 200
+$main_form.Height = 150
+$main_form.AutoSize = $true
+$main_form.MaximizeBox = $false
+$main_form.FormBorderStyle='Fixed3D'
+
+$include_label = New-Object System.Windows.Forms.Label
+$include_label.Text = "Keep:"
+$include_label.Location  = New-Object System.Drawing.Point(10,10)
+$include_label.AutoSize = $true
+$main_form.Controls.Add($include_label)
+
+$radiobutton1 = New-Object System.Windows.Forms.RadioButton 
+$radiobutton1.Location = New-Object System.Drawing.Size(10,25) 
+$radiobutton1.Size = New-Object System.Drawing.Size(200,20)
+$radiobutton1.Text = "Generation log + Runtime files"
+$radiobutton1.Checked = $true 
+$main_form.Controls.Add($radiobutton1)
+
+$radiobutton2 = New-Object System.Windows.Forms.RadioButton 
+$radiobutton2.Location = New-Object System.Drawing.Size(210,25) 
+$radiobutton2.Size = New-Object System.Drawing.Size(130,20)
+$radiobutton2.Text = "Runtime files"
+$main_form.Controls.Add($radiobutton2)
+
+$browse_label = New-Object System.Windows.Forms.Label
+$browse_label.Text = "Select script(s):"
+$browse_label.Location  = New-Object System.Drawing.Point(10,57)
+$browse_label.AutoSize = $true
+$main_form.Controls.Add($browse_label)
+
+$browse_button = New-Object System.Windows.Forms.Button
+$browse_button.Text = "Browse"
+$browse_button.Location  = New-Object System.Drawing.Size(10,75)
+$browse_button.Size = New-Object System.Drawing.Size(100,23)
+$browse_button.AutoSize = $true
+$main_form.Controls.Add($browse_button)
+
+$status_label = New-Object System.Windows.Forms.Label
+$status_label.Text = "Status : Not started"
+$status_label.Location  = New-Object System.Drawing.Point(10,115)
+$status_label.AutoSize = $true
+$main_form.Controls.Add($status_label)
+
+
+if([bool](([System.Security.Principal.WindowsIdentity]::GetCurrent()).groups -match "S-1-5-32-544") -eq $false)
+{
+    $status_label.Text = "Run as Administrator"
+    $browse_button.Enabled = $false
+}
+
+
+
+
+$browse_button.Add_Click({Get-Folder})
+
+$main_form.ShowDialog()
+
